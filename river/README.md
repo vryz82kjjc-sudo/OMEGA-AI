@@ -74,16 +74,44 @@ La solución correcta (trabajo futuro) es un **análisis multiescala**: detectar
 cauce sobre una representación de la señal con las ondas puntuales ya filtradas,
 en lugar de reaprovechar la misma base. No se parchea; se rediseña.
 
+## Banco de pruebas con ataques reales (defensa por capas)
+
+`gen-log.js` genera un log de servidor (formato Combined) con **siete ataques**
+modelados por su huella en la telemetría (estilo MITRE ATT&CK): DDoS, fuerza
+bruta, credential stuffing distribuido, escaneo de vulnerabilidades, sondeo de
+exploits (5xx), exfiltración y **beacon C2 de un troyano**. `ingest.js` lo
+procesa **ciego**, en dos capas:
+
+- **Capa A — ríos de volumen**: `req_min`, `auth_fail`, `not_found`,
+  `server_err`, `unique_ips`, `bytes_mb`. Caza los seis ataques ruidosos
+  (latencia 0-2 min) y correlaciona DDoS y fuerza bruta.
+- **Capa B — periodicidad**: mide la regularidad de los intervalos por fuente.
+  Caza el beacon C2 (low-and-slow) que el volumen no ve: una fuente que llama a
+  casa cada ~30 s con coeficiente de variación ínfimo.
+
+Resultado del banco: **7/7 ataques detectados**, con falsos positivos reducidos
+de ~15 a ~1 gracias a dos mejoras del motor:
+
+1. **EWMA robusto (Huber)**: un pico enorme no arrastra la media, así no deja
+   una cola de falsas alarmas al terminar (la exfiltración pasó de 18 min de
+   falsas alarmas a 0).
+2. **Suelo de Poisson** en canales de conteo (`poisson:true`): la dispersión no
+   cae por debajo de √media, así un 0→2 en un canal casi vacío no parece un
+   terremoto (eliminó las falsas alarmas del arranque).
+
+Correr: `node river/gen-log.js /tmp/a.log /tmp/t.json && node river/ingest.js /tmp/a.log /tmp/t.json`
+
 ## Parámetros (`new RiverDetector({ ... })`)
 
 | Param | Def. | Significado |
 |---|---|---|
 | `halfLife` | 15 | memoria del flujo (muestras) |
 | `warmup` | 40 | muestras para aprender antes de juzgar |
-| `rippleZ` | 4 | a cuántas desviaciones una muestra es "onda" |
+| `rippleZ` | 4 | a cuántas desviaciones una muestra es "onda" (y tope del Huber) |
 | `cusumDrift` | 1.0 | colchón del CUSUM (debe superar el sesgo del vaivén normal) |
 | `cusumH` | 5 | umbral de disparo del cauce |
 | `shiftCooldown` | 30 | silencio tras avisar de un cauce |
+| `poisson` | false | pon `true` en canales de conteo (suelo de dispersión √media) |
 
 > **Nota:** estos valores se validaron sobre un río sintético. En datos reales,
 > `halfLife`, `rippleZ` y los del CUSUM se recalibran según el ritmo y el ruido

@@ -32,10 +32,11 @@ class FlowBaseline {
    *                              Río "rápido" = memoria corta; "lento" = larga.
    * @param {number} o.warmup    Muestras mínimas antes de emitir juicios.
    */
-  constructor({ halfLife = 50, warmup = 30 } = {}) {
+  constructor({ halfLife = 50, warmup = 30, huberZ = 4 } = {}) {
     if (!(halfLife > 0)) throw new Error('halfLife debe ser > 0');
     this.alpha = 1 - Math.pow(0.5, 1 / halfLife); // factor de olvido
     this.warmup = warmup;
+    this.huberZ = huberZ; // más allá de esto, la muestra no arrastra la media
     this.n = 0;
     this.mean = 0;   // caudal normal estimado
     this.dev = 0;    // dispersión normal estimada (escala de la onda)
@@ -43,6 +44,7 @@ class FlowBaseline {
 
   /** Incorpora una muestra y devuelve el estado anterior (para puntuar sin fuga). */
   observe(x) {
+    const K = 1.2533;
     const prevMean = this.mean;
     const prevDev = this.dev;
     if (this.n === 0) {
@@ -50,11 +52,18 @@ class FlowBaseline {
       this.dev = 0;
     } else {
       const a = this.alpha;
-      this.mean = a * x + (1 - a) * this.mean;
-      // La dispersión (escala de la onda) debe ser ROBUSTA: una piedra enorme
-      // no debe inflar la escala y dejar sordo al detector del cauce. Un residuo
-      // mayor que ~8 desviaciones es "un evento, no el flujo": no enseña la
-      // escala más allá de ese tope. El ruido normal (<8 dev) no se ve afectado.
+      // EWMA ROBUSTO (Huber): una piedra enorme NO debe arrastrar la media del
+      // río. Actualizamos la media hacia un valor recortado a ±huberZ·escala,
+      // así la base se mantiene estable durante el pico y no deja un "hueco"
+      // que luego parezca anomalía (la cola de falsas alarmas tras un pico).
+      let xUpd = x;
+      if (prevDev > 0) {
+        const lim = this.huberZ * prevDev * K;
+        xUpd = Math.max(prevMean - lim, Math.min(prevMean + lim, x));
+      }
+      this.mean = a * xUpd + (1 - a) * this.mean;
+      // La dispersión también es robusta: un residuo mayor que ~8 desviaciones
+      // no enseña la escala más allá de ese tope.
       let absResid = Math.abs(x - prevMean);
       if (prevDev > 0) absResid = Math.min(absResid, 8 * prevDev);
       this.dev = a * absResid + (1 - a) * this.dev;
@@ -116,10 +125,14 @@ class RiverDetector {
     //  - CAUCE = CUSUM: muchos z moderados sostenidos en una dirección. El
     //    colchón (drift) se fija por encima del pequeño sesgo que el oleaje
     //    deja en el residuo, de modo que solo un desvío REAL acumula.
-    const { halfLife = 15, warmup = 40, rippleZ = 4, cusumDrift = 1.0, cusumH = 5, shiftCooldown = 30 } = o;
-    this.baseline = new FlowBaseline({ halfLife, warmup });
+    const { halfLife = 15, warmup = 40, rippleZ = 4, cusumDrift = 1.0, cusumH = 5, shiftCooldown = 30, poisson = false } = o;
+    this.baseline = new FlowBaseline({ halfLife, warmup, huberZ: rippleZ });
     this.cusum = new Cusum({ drift: cusumDrift, threshold: cusumH });
     this.rippleZ = rippleZ;
+    // Para canales de CONTEO (logins, 404...): la dispersión no puede caer por
+    // debajo del ruido de Poisson (~sqrt(media)). Evita que un 0->2 parezca
+    // enorme cuando el canal normalmente está casi a cero.
+    this.poisson = poisson;
     this.shiftCooldown = shiftCooldown; // muestras de silencio tras avisar de un cauce
     this.cooldownUntil = 0;
     this.t = 0;
@@ -139,7 +152,11 @@ class RiverDetector {
     const K = 1.2533; // sqrt(pi/2): desv. absoluta media -> desv. típica (ruido gaussiano)
 
     const { prevMean, prevDev } = this.baseline.observe(x);
-    const z = this.baseline.n > 1 ? (x - prevMean) / (Math.max(prevDev, 1e-9) * K) : 0;
+    // Escala = dispersión aprendida, pero nunca por debajo del ruido de Poisson
+    // en canales de conteo (suelo = sqrt(media)).
+    const floor = this.poisson ? Math.sqrt(Math.max(prevMean, 1)) : 0;
+    const scale = Math.max(prevDev * K, floor, 1e-9);
+    const z = this.baseline.n > 1 ? (x - prevMean) / scale : 0;
 
     const ready = this.baseline.ready;
     let ripple = false, shift = false, shiftDir = null, cusumLevel = 0;
