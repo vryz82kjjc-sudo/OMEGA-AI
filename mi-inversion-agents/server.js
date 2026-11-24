@@ -4,6 +4,10 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const https=require('node:https');
+const dns=require('node:dns');
+const net=require('node:net');
+const zlib=require('node:zlib');
 const {URL} = require('node:url');
 
 const PORT = Number(process.env.PORT || 10000);
@@ -52,6 +56,77 @@ function extractListing(text){
   return {price:candidates[0]||null,area:area?parseMoney(area[1]):null,rooms:rooms?Number(rooms[1]):null,
     alert:'Extracción orientativa del texto proporcionado. Verifica manualmente todos los campos y la fuente.'};
 }
+
+/** Public, read-only listing import. No logins, CAPTCHA evasion or restricted data. */
+const MAX_LISTING_HTML=1500000;
+function entities(v){return String(v??'').replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos|nbsp|euro|ntilde);/gi,(all,k)=>{
+ const m={amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",nbsp:' ',euro:'€',ntilde:'ñ'};
+ if(k[0]==='#'){const n=k[1].toLowerCase()==='x'?parseInt(k.slice(2),16):parseInt(k.slice(1),10);return n>0&&n<=0x10ffff?String.fromCodePoint(n):' '}
+ return m[k.toLowerCase()]||all;
+})}
+function attr(tag){const obj={};for(const m of tag.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g))obj[m[1].toLowerCase()]=entities(m[2]??m[3]??m[4]);return obj}
+const cities=['Madrid','Barcelona','Valencia','Sevilla','Zaragoza','Málaga','Murcia','Bilbao','Alicante','Oviedo','Gijón','Santander','Torrelavega','Camargo','Piélagos','Astillero','Laredo','Castro Urdiales','Burgos','Valladolid','Pamplona','León','Salamanca','Cádiz','Granada','Albacete','Vigo','Huelva','Logroño','Badajoz','Almería','Tarragona','Lleida'];
+function cityFromText(text){
+ const t=String(text||'');
+ const m=t.match(/(?:piso|casa|chalet|ático|apartamento|vivienda)\s+(?:en venta\s+)?en\s+([A-ZÁÉÍÓÚÑ][\p{L}\s-]{2,35})(?:\s*[,|·–-]|\s+con\s+|\s+por\s+|$)/iu);
+ if(m&&!/^(venta|alquiler|exclusiva)$/i.test(m[1].trim()))return m[1].trim();
+ return cities.find(c=>new RegExp('(?:^|[^\\p{L}])'+c+'(?:$|[^\\p{L}])','iu').test(t))||null
+}
+function parseTextAd(text){
+ const str=entities(String(text||'').replace(/\s+/g,' ').slice(0,12000)),r=extractListing(str);
+ const m=str.match(/(?:precio(?: de venta)?|venta|por)\s*[:\-]?\s*(\d{2,3}(?:[.\s]\d{3})+(?:,\d{1,2})?|\d{5,8})\s*(?:€|euros?)?/i);
+ const price=r.price||(m?parseMoney(m[1].replace(/\s/g,'')):null);
+ return {price:price>10000?price:null,area:r.area>=15?r.area:null,city:cityFromText(str),rooms:r.rooms||null,title:null,district:null};
+}
+function parsePublicListingHTML(html,url){
+ const meta={};for(const m of String(html||'').matchAll(/<meta\b[^>]*>/gi)){const a=attr(m[0]),k=(a.property||a.name||a.itemprop||'').toLowerCase();if(k&&a.content&&!meta[k])meta[k]=a.content}
+ const titleTag=String(html||'').match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]||'';
+ const visible=String(html||'').replace(/<(script|style|noscript|svg)\b[^>]*>[\s\S]*?<\/\1>/gi,' ').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').slice(0,14000);
+ const info=parseTextAd([meta['og:title'],meta['og:description'],meta.description,titleTag,visible].filter(Boolean).join(' '));
+ let selected={},score=-1;
+ function scan(o,depth=0){if(!o||typeof o!=='object'||depth>8)return;if(Array.isArray(o)){o.slice(0,35).forEach(v=>scan(v,depth+1));return}
+ const address=o.address||o.location?.address||{};
+ const p=parseMoney(String(o.offers?.price||o.price||o.priceSpecification?.price||'')),area=Number(o.floorSize?.value||o.floorSize||o.area?.value||o.size?.value||0);
+ const x={price:p>10000?p:null,area:area>=15?area:null,city:typeof address==='object'?(address.addressLocality||null):null,rooms:Number(o.numberOfBedrooms||o.numberOfRooms)||null,title:typeof o.name==='string'?o.name:null,district:null};
+ const sc=(x.price?4:0)+(x.area?4:0)+(x.city?2:0)+(/apartment|house|realestate|residence|product|offer/i.test(String(o['@type']||''))?3:0);
+ if(sc>score&&sc>=5){selected=x;score=sc}
+ for(const [key,v] of Object.entries(o))if(v&&typeof v==='object'&&!['image','video','review','aggregateRating'].includes(key))scan(v,depth+1)
+ }
+ for(const m of String(html||'').matchAll(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)){try{scan(JSON.parse(m[1]))}catch{}}
+ const mp=parseMoney(meta['product:price:amount']||meta['og:price:amount']||meta.price||'');
+ const fields={price:selected.price|| (mp>10000?mp:null)||info.price,area:selected.area||info.area,city:selected.city||info.city,rooms:selected.rooms||info.rooms,title:selected.title||entities(meta['og:title']||titleTag).slice(0,150)||null,district:null};
+ const missing=['price','area','city'].filter(k=>!fields[k]);
+ return {status:missing.length?'partial':'extracted',fields,missing,url,source:'HTML público del anuncio',checkedAt:new Date().toISOString(),note:'Extracción orientativa de metadatos y texto accesible; confirma los datos con la fuente y documentación.'}
+}
+function publicIPv4(address){if(net.isIP(address)!==4)return false;const a=address.split('.').map(Number);return !(a[0]===0||a[0]===10||a[0]===127||a[0]>=224||(a[0]===169&&a[1]===254)||(a[0]===172&&a[1]>=16&&a[1]<=31)||(a[0]===192&&a[1]===168)||(a[0]===100&&a[1]>=64&&a[1]<=127)||(a[0]===198&&(a[1]===18||a[1]===19)))}
+function publicURL(raw){
+ let u;try{u=new URL(String(raw||''))}catch{throw Error('Pega un enlace válido que empiece por https://')}
+ if(String(raw||'').length>1200||u.protocol!=='https:'||u.port||u.username||u.password||net.isIP(u.hostname)||!u.hostname.includes('.')||u.hostname.endsWith('.local')||u.hostname.endsWith('.internal'))throw Error('Se requiere un enlace HTTPS público');
+ return u;
+}
+function readPublicHTML(raw,redirects=2){
+ const u=publicURL(raw);
+ return new Promise((resolve,reject)=>{
+  const req=https.request(u,{timeout:11000,family:4,headers:{'User-Agent':'MiInversionIA-ListingReader/1.0','Accept':'text/html,application/xhtml+xml','Accept-Encoding':'identity'},lookup:(host,opts,cb)=>dns.lookup(host,{all:true,family:4},(err,recs)=>{if(err||!recs?.length)return cb(err||Error('DNS no disponible'));if(recs.some(r=>!publicIPv4(r.address)))return cb(Error('Dirección no pública'));cb(null,recs[0].address,4)})},res=>{
+   if([301,302,303,307,308].includes(res.statusCode)){res.resume();if(!res.headers.location||!redirects)return reject(Error('Redirecciones no disponibles'));try{return readPublicHTML(new URL(res.headers.location,u).href,redirects-1).then(resolve,reject)}catch(e){return reject(e)}}
+   if([401,403,429].includes(res.statusCode)){res.resume();return reject(Error('El portal limita el acceso automatizado'))}
+   if(res.statusCode!==200){res.resume();return reject(Error('Anuncio no accesible: HTTP '+res.statusCode))}
+   if(!/html|text\/plain/i.test(String(res.headers['content-type']||''))){res.resume();return reject(Error('Este enlace no contiene un anuncio HTML accesible'))}
+   let size=0,chunks=[];res.on('data',b=>{size+=b.length;if(size>MAX_LISTING_HTML)return res.destroy(Error('Página demasiado grande'));chunks.push(b)});
+   res.on('end',()=>{try{let body=Buffer.concat(chunks);if(res.headers['content-encoding']==='gzip')body=zlib.gunzipSync(body);if(res.headers['content-encoding']==='br')body=zlib.brotliDecompressSync(body);if(body.length>MAX_LISTING_HTML)throw Error('Página descomprimida demasiado grande');resolve({html:body.toString('utf8'),url:u.href})}catch(e){reject(e)}});res.on('error',reject)
+  });req.on('timeout',()=>req.destroy(Error('Tiempo de lectura agotado')));req.on('error',reject);req.end()
+ })
+}
+async function importListing(payload={}){
+ if(typeof payload.text==='string'&&payload.text.trim().length>55){
+  const fields=parseTextAd(payload.text);fields.title=payload.text.replace(/\s+/g,' ').trim().slice(0,120);const missing=['price','area','city'].filter(k=>!fields[k]);
+  return {status:missing.length?'partial':'extracted',fields,missing,source:'Texto aportado por el comprador',note:'Campos reconocidos en el texto del anuncio; revisar antes de decidir.'}
+ }
+ const u=publicURL(payload.url);
+ try{return parsePublicListingHTML((await readPublicHTML(u.href)).html,u.href)}
+ catch(e){return {status:'unavailable',url:u.href,fields:{price:null,area:null,city:null,rooms:null,title:null},missing:['price','area','city'],reason:clean(e.message,180),note:'El portal no permitió leer el anuncio. Copia el texto del anuncio completo, sin rellenar sus campos por separado.'}}
+}
+
 function mortgage(principal,annualPct,years){
   const months=Math.round(years*12);if(!(months>0 && principal>=0))return null;
   const rate=annualPct/1200;
@@ -148,9 +223,12 @@ async function route(req,res){
   if(req.method==='OPTIONS'){res.writeHead(204,{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'Content-Type, X-Agent-Admin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Vary':'Origin'});res.end();return;}
   if(req.method==='GET'&&(pathname==='/'||pathname==='/index.html'))return sendFile(res,'index.html');
   if(req.method==='GET'&&pathname==='/api/health')return json(res,200,{ok:true,service:'Mi Inversion IA Agentes API',now:new Date().toISOString()},origin);
-  if(req.method==='GET'&&pathname==='/api/capabilities')return json(res,200,{agents:AGENTS,engines:{rules:{active:true},externalBankOffers:{active:false},notaryBooking:{active:false},propertyScraping:{active:false},llm:{active:false},tinyfish:{active:process.env.TINYFISH_ENABLED==='true'&&Boolean(process.env.TINYFISH_API_KEY),requiresAdmin:true}},persistence:'ninguna',security:'No envíes datos personales sensibles. Las respuestas no se almacenan.',provider:'Render'},origin);
+  if(req.method==='GET'&&pathname==='/api/capabilities')return json(res,200,{agents:AGENTS,engines:{rules:{active:true},externalBankOffers:{active:false},notaryBooking:{active:false},propertyScraping:{active:true,mode:'HTML público sin evadir restricciones; texto pegado como respaldo'},llm:{active:false},tinyfish:{active:process.env.TINYFISH_ENABLED==='true'&&Boolean(process.env.TINYFISH_API_KEY),requiresAdmin:true}},persistence:'ninguna',security:'No envíes datos personales sensibles. Las respuestas no se almacenan.',provider:'Render'},origin);
   if(req.method==='GET'&&pathname==='/api/sources')return json(res,200,{sources:SOURCES,description:'Enlaces oficiales disponibles. No se afirma acceso a bases de datos protegidas.'},origin);
   if(throttled(req))return json(res,429,{error:'Límite temporal de peticiones. Reinténtalo más tarde.'},origin);
+  if(req.method==='POST'&&pathname==='/api/import-listing'){
+    try{const body=await readBody(req);return json(res,200,await importListing(body),origin)}catch(e){return json(res,400,{error:clean(e.message,220)},origin)}
+  }
   if(req.method==='POST'&&pathname==='/api/analyze'){
     try{const body=await readBody(req);return json(res,200,evaluate(body),origin)}catch(e){return json(res,400,{error:e.message},origin)}
   }
@@ -161,4 +239,4 @@ async function route(req,res){
   json(res,404,{error:'No existe ese endpoint'},origin);
 }
 if(require.main===module){const server=http.createServer((req,res)=>{route(req,res).catch(e=>json(res,500,{error:'Error interno de servicio'},originOf(req)))});server.listen(PORT,'0.0.0.0',()=>console.log(`Mi Inversión IA agentes escuchando en ${PORT}`));}
-module.exports={evaluate,mortgage,extractListing,AGENTS,SOURCES,parseMoney};
+module.exports={evaluate,mortgage,extractListing,parseTextAd,parsePublicListingHTML,publicURL,importListing,AGENTS,SOURCES,parseMoney};
