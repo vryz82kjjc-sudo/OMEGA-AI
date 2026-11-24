@@ -171,3 +171,21 @@ en tu propio sistema y con permisos**: bloquear es una acción real hacia fuera.
 > **Nota:** estos valores se validaron sobre un río sintético. En datos reales,
 > `halfLife`, `rippleZ` y los del CUSUM se recalibran según el ritmo y el ruido
 > propios de la señal. Afinarlos sobre el juguete sería sobreajuste.
+
+## Evaluación honesta en datos reales independientes (NAB)
+
+`nab-eval.js` y `nab-roc.js` evalúan el río sobre el Numenta Anomaly Benchmark
+(series reales con anomalías etiquetadas por terceros) y lo comparan, de forma
+justa (curva recall vs falsos positivos), contra un detector simple de z-score.
+
+**Resultado honesto:** a igualdad de falsos positivos, el río NO supera al
+umbral simple en la zona usable. En datos reales con deriva natural
+(estacionalidad), el CUSUM —la ventaja teórica del río para detectar cambios de
+régimen— dispara en exceso: nunca baja de ~95 falsos positivos, mientras el
+simple opera con 0-29. El río logra mayor recall máximo (14/14) pero solo
+tolerando mucho ruido (147+ FP). Conclusión: "mejor que lo que existe" NO está
+demostrado; hace falta separar el cambio de régimen real de la estacionalidad
+normal (desestacionalizar antes del CUSUM) — trabajo pendiente y no probado.
+
+Correr (requiere descargar NAB aparte, no se versiona):
+`node river/nab-eval.js <dir_datos_NAB> <labels/combined_windows.json>`
