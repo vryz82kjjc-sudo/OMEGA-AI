@@ -1,0 +1,1 @@
+{"name":"mi-inversion-ia-agents","version":"1.0.0","private":true,"description":"11 módulos verificables y API para Mi Inversión IA","main":"server.js","scripts":{"start":"node server.js","test":"node --test test.js"},"engines":{"node":">=20"}}
