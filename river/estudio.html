@@ -109,26 +109,22 @@ code{font-family:var(--mono);background:color-mix(in srgb,var(--fg) 8%,transpare
   <section>
     <div class="eyebrow">03 · La prueba honesta</div>
     <h2>¿Gana el RÍO en datos reales?</h2>
-    <p class="lead">11 series reales (CPU en la nube, tráfico, latencia, fallos de sistema) con <strong>29 anomalías etiquetadas por terceros</strong> — etiquetas que no controlo. Se mide la separación (AUC) entre puntos de anomalía y normales, y la curva de recall frente a falsos positivos, con las mismas reglas para ambos.</p>
+    <p class="lead">46 series reales (CPU en la nube, tráfico, latencia, fallos de sistema y volumen de menciones de empresas reales en redes) con <strong>105 anomalías etiquetadas por terceros</strong> — etiquetas que no controlo. Se comparan cuatro detectores con las mismas reglas: la separación (AUC) entre anomalía y normal, y cuántas anomalías caza cada uno a pocas falsas alarmas.</p>
     <div class="kpis">
-      <div class="kpi"><div class="v" style="color:var(--ok)">0.705</div><div class="l">AUC · IF + Fourier (mejor)</div></div>
-      <div class="kpi"><div class="v" style="color:var(--mut)">0.650</div><div class="l">AUC · IF básico</div></div>
-      <div class="kpi"><div class="v" style="color:var(--river)">0.596</div><div class="l">AUC de separación · RÍO</div></div>
-      <div class="kpi"><div class="v" style="color:var(--simple)">0.549</div><div class="l">AUC · umbral simple</div></div>
+      <div class="kpi"><div class="v" style="color:var(--ok)">0.691</div><div class="l">AUC · IF + Fourier (mejor)</div></div>
+      <div class="kpi"><div class="v" style="color:var(--mut)">0.674</div><div class="l">AUC · IF básico</div></div>
+      <div class="kpi"><div class="v" style="color:var(--river)">0.569</div><div class="l">AUC de separación · RÍO</div></div>
+      <div class="kpi"><div class="v" style="color:var(--simple)">0.524</div><div class="l">AUC · umbral simple</div></div>
       <div class="kpi"><div class="v" style="color:var(--mut)">0.50</div><div class="l">azar puro (referencia)</div></div>
     </div>
-    <p class="muted">Dar al detector la <strong>firma de Fourier</strong> de cada onda —su forma, no solo su tamaño— da el mayor salto del estudio: AUC 0.705 y, por primera vez, supera al umbral simple a pocas falsas alarmas (25 frente a 22 de 29). Leer la ecuación de la onda es la palanca que funciona.</p>
+    <p class="muted">Dar al detector la <strong>firma de Fourier</strong> de cada onda —su forma, no solo su tamaño— da el mayor salto del estudio, y la ventaja <strong>crece al escalar a 105 anomalías</strong>: caza 77 frente a 57 del umbral simple en la zona de pocas falsas alarmas. Leer la ecuación de la onda es la palanca que funciona.</p>
     <figure>
-      <svg id="chartRoc" viewBox="0 0 680 340" role="img" aria-label="Curva de recall frente a falsos positivos"></svg>
-      <figcaption>Recall (fracción de las 29 anomalías detectadas) frente a falsos positivos. Mejor = arriba y a la izquierda. A pocos falsos positivos el simple iguala o gana; el río solo despega tolerando más ruido.</figcaption>
+      <svg id="chartBars" viewBox="0 0 680 250" role="img" aria-label="Anomalías detectadas a pocas falsas alarmas por detector"></svg>
+      <figcaption>Anomalías detectadas (de 105) tolerando como mucho 5 falsas alarmas por serie. Leer la forma de la onda (Fourier) gana con claridad; el río, nuestro detector original, queda el último.</figcaption>
     </figure>
-    <div class="legend">
-      <span><b style="background:var(--river)"></b>RÍO</span>
-      <span><b style="background:var(--simple)"></b>Detector simple (z de ventana)</span>
-    </div>
     <div class="grid2" style="margin-top:16px">
-      <div class="card" style="margin-top:0"><h3 style="font-size:14px">A ≤5 falsos positivos</h3><p style="margin:6px 0 0"><span class="dyn">RÍO 9/29</span> · <span class="hand">simple 11/29</span></p><p class="muted" style="margin:4px 0 0">El simple gana en la zona usable.</p></div>
-      <div class="card" style="margin-top:0"><h3 style="font-size:14px">Techo de recall</h3><p style="margin:6px 0 0"><span class="dyn">RÍO 19/29</span> · <span class="hand">simple 17/29</span></p><p class="muted" style="margin:4px 0 0">El río detecta más… con muchos más falsos.</p></div>
+      <div class="card" style="margin-top:0"><h3 style="font-size:14px">A ≤5 falsas alarmas</h3><p style="margin:6px 0 0"><span style="color:var(--ok)">Fourier 77/105</span> · <span class="hand">simple 57</span> · <span class="dyn">río 46</span></p><p class="muted" style="margin:4px 0 0">La firma de Fourier gana la zona usable.</p></div>
+      <div class="card" style="margin-top:0"><h3 style="font-size:14px">Más datos, misma lección</h3><p style="margin:6px 0 0">De 29 a <strong>105 anomalías</strong></p><p class="muted" style="margin:4px 0 0">La ventaja de Fourier creció al escalar: señal de que es real.</p></div>
     </div>
   </section>
 
@@ -139,8 +135,8 @@ code{font-family:var(--mono);background:color-mix(in srgb,var(--fg) 8%,transpare
       <p style="margin-top:0"><strong>Verdad:</strong> el río detecta, y su maquinaria (CUSUM) tiene fuerza matemática real para señales sutiles y sostenidas — la ley del √n lo demuestra en condiciones controladas.</p>
       <p><strong>No demostrado:</strong> que sea “mejor que lo que existe”. En datos reales diversos, a pocas falsas alarmas, un umbral simple lo iguala o lo supera. Su ventaja teórica (detectar cambios lentos) es también su maldición: confunde la deriva natural de los datos reales con ataques.</p>
     </div>
-    <p><strong>Más potencia, no bala de plata:</strong> un Isolation Forest mejora la separación (AUC 0.650 &gt; 0.596 &gt; 0.549), pero a ≤5 falsos positivos los tres detectan lo mismo (~21/29). El problema de fondo no lo arregla un algoritmo más fuerte.</p>
-    <p><strong>La palanca que sí funciona</strong> no es un algoritmo más potente, sino mejores características. Dar al detector la <strong>forma</strong> de la onda —su descomposición de Fourier: frecuencia, periodicidad, tendencia— sube el AUC a 0.705 y rompe por fin la barrera a pocas falsas alarmas (25/29). Una anomalía que cambia la frecuencia del sistema es invisible a su tamaño y evidente a su forma. La dirección que faltaba ya tiene prueba.</p>
+    <p><strong>Más potencia ayuda, pero no basta:</strong> un Isolation Forest mejora la separación (AUC 0.674 frente a 0.524 del umbral simple), pero el salto grande llega al darle las características de Fourier, no por ser un algoritmo más fuerte.</p>
+    <p><strong>La palanca que sí funciona</strong> no es un algoritmo más potente, sino mejores características. Dar al detector la <strong>forma</strong> de la onda —su descomposición de Fourier: frecuencia, periodicidad, tendencia— sube el AUC a 0.691 y, sobre 105 anomalías reales, caza 77 frente a 57 del umbral simple a pocas falsas alarmas. Una anomalía que cambia la frecuencia del sistema es invisible a su tamaño y evidente a su forma. La dirección que faltaba ya tiene prueba, y la ventaja crece con más datos.</p>
     <hr>
     <p class="foot">Datos: Numenta Anomaly Benchmark (series reales, etiquetas independientes) y logs OpenSSH reales (loghub). Todo reproducible: <code>river/study.js</code>, <code>river/sqrt-n.js</code>, <code>river/nab-roc.js</code>. Métrica AUC calculada por punto (conservadora para anomalías de ventana); comparación río vs simple con idéntica regla de puntuación.</p>
 </section>
@@ -149,8 +145,8 @@ code{font-family:var(--mono);background:color-mix(in srgb,var(--fg) 8%,transpare
 <script>
 const law=[[25,0.54,2.70],[50,0.40,2.83],[100,0.28,2.80],[200,0.16,2.26],[400,0.08,1.60],[800,0.04,1.13]];
 const force=[[0.1,1,49],[0.2,1,78],[0.3,1,96],[0.5,3,100],[0.8,13,100],[1.5,84,100],[3.0,100,100]];
-const river=[[4,0.172],[5,0.31],[6,0.31],[7,0.379],[8,0.448],[9,0.517],[17,0.552],[20,0.586],[24,0.621],[26,0.655],[32,0.655]];
-const simple=[[2,0.276],[3,0.276],[4,0.379],[5,0.379],[6,0.517],[8,0.586],[9,0.586],[12,0.586],[16,0.586],[23,0.586],[30,0.586]];
+const bars=[['IF + Fourier',77,'--ok'],['IF básico',65,'--mut'],['Simple (z)',57,'--simple'],['RÍO',46,'--river']];
+const BARTOTAL=105;
 const css=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
 const SVGNS='http://www.w3.org/2000/svg';
 function el(n,a){const e=document.createElementNS(SVGNS,n);for(const k in a)e.setAttribute(k,a[k]);return e;}
@@ -184,10 +180,15 @@ function plot(svg,data,W,H,P,xmax,ymax,color,xi,yi){
   const l1=el('text',{x:W-16,y:40,fill:css('--river'),'font-size':12,'text-anchor':'end','font-family':'monospace','font-weight':600});l1.textContent='dinamita (CUSUM)';svg.appendChild(l1);
   const l2=el('text',{x:W-16,y:58,fill:css('--simple'),'font-size':12,'text-anchor':'end','font-family':'monospace','font-weight':600});l2.textContent='mano (z puntual)';svg.appendChild(l2);
 })();
-// gráfico ROC
-(function(){const svg=document.getElementById('chartRoc'),W=680,H=340,P=50;
-  axes(svg,W,H,P,32,0.7,'falsos positivos','recall (de 29)',v=>v.toFixed(1));
-  plot(svg,simple,W,H,P,32,0.7,css('--simple'),0,1);
-  plot(svg,river,W,H,P,32,0.7,css('--river'),0,1);
+// gráfico de barras: anomalías detectadas a <=5 falsas alarmas
+(function(){const svg=document.getElementById('chartBars'),W=680,H=250,P=132,top=16,bh=38,gap=18;
+  const full=W-56-P;
+  bars.forEach((b,i)=>{const y=top+i*(bh+gap);
+    const lbl=el('text',{x:P-12,y:y+bh/2+5,fill:css('--fg'),'font-size':14,'text-anchor':'end','font-family':'monospace','font-weight':600});lbl.textContent=b[0];svg.appendChild(lbl);
+    svg.appendChild(el('rect',{x:P,y,width:full,height:bh,rx:7,fill:css('--mut'),opacity:.12}));
+    svg.appendChild(el('rect',{x:P,y,width:full*b[1]/BARTOTAL,height:bh,rx:7,fill:css(b[2])}));
+    const val=el('text',{x:P+full*b[1]/BARTOTAL+8,y:y+bh/2+5,fill:css('--fg'),'font-size':13,'font-family':'monospace','font-weight':600});val.textContent=b[1];svg.appendChild(val);
+  });
+  const cap=el('text',{x:P,y:H-8,fill:css('--mut'),'font-size':11.5,'font-family':'monospace'});cap.textContent='anomalías detectadas de 105 (≤5 falsas alarmas)';svg.appendChild(cap);
 })();
 </script>
