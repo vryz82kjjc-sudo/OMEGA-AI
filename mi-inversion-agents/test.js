@@ -12,3 +12,6 @@ const {parseTextAd,parsePublicListingHTML,publicURL,importListing}=require('./se
 test('Lee anuncio completo con precio metros y municipio en un solo texto',async()=>{const r=await importListing({text:'Piso en venta en Santander con tres habitaciones, 83 m², precio 239.000 €. Amplio salón con terraza.'});assert.equal(r.status,'extracted');assert.equal(r.fields.price,239000);assert.equal(r.fields.area,83);assert.equal(r.fields.city,'Santander')});
 test('Extrae de JSON-LD un anuncio públicamente accesible',()=>{const h='<html><head><script type="application/ld+json">{"@context":"https://schema.org","@type":"Apartment","name":"Piso de Santander","offers":{"price":"239000"},"floorSize":{"value":83},"address":{"addressLocality":"Santander"},"numberOfBedrooms":3}</script></head></html>';const x=parsePublicListingHTML(h,'https://example.org/piso');assert.equal(x.status,'extracted');assert.equal(x.fields.price,239000);assert.equal(x.fields.area,83);assert.equal(x.fields.city,'Santander')});
 test('Bloquea URLs privadas y puertos de red no públicos',()=>{for(const u of ['http://example.com','https://127.0.0.1/','https://localhost','https://example.com:8080'])assert.throws(()=>publicURL(u))});
+
+// Listing importer security and extraction checks are part of the build gate.
+require('./listing.test.js');
