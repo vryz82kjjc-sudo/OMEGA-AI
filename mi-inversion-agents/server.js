@@ -68,9 +68,10 @@ function attr(tag){const obj={};for(const m of tag.matchAll(/([\w:-]+)\s*=\s*(?:
 const cities=['Madrid','Barcelona','Valencia','Sevilla','Zaragoza','Málaga','Murcia','Bilbao','Alicante','Oviedo','Gijón','Santander','Torrelavega','Camargo','Piélagos','Astillero','Laredo','Castro Urdiales','Burgos','Valladolid','Pamplona','León','Salamanca','Cádiz','Granada','Albacete','Vigo','Huelva','Logroño','Badajoz','Almería','Tarragona','Lleida'];
 function cityFromText(text){
  const t=String(text||'');
- const m=t.match(/(?:piso|casa|chalet|ático|apartamento|vivienda)\s+(?:en venta\s+)?en\s+([A-ZÁÉÍÓÚÑ][\p{L}\s-]{2,35})(?:\s*[,|·–-]|\s+con\s+|\s+por\s+|$)/iu);
- if(m&&!/^(venta|alquiler|exclusiva)$/i.test(m[1].trim()))return m[1].trim();
- return cities.find(c=>new RegExp('(?:^|[^\\p{L}])'+c+'(?:$|[^\\p{L}])','iu').test(t))||null
+ const known=cities.find(c=>new RegExp('(?:^|[^\\p{L}])'+c+'(?:$|[^\\p{L}])','iu').test(t));
+ if(known)return known;
+ const m=t.match(/(?:piso|casa|chalet|ático|apartamento|vivienda)\s+(?:en venta\s+)?en\s+([A-ZÁÉÍÓÚÑ][\p{L}\s-]{2,45}?)(?=\s*[,|·–-]|\s+con\b|\s+por\b|\s+precio\b|\.|$)/iu);
+ return m&&!/^(venta|alquiler|exclusiva)$/i.test(m[1].trim())?m[1].trim():null
 }
 function parseTextAd(text){
  const str=entities(String(text||'').replace(/\s+/g,' ').slice(0,12000)),r=extractListing(str);
