@@ -51,7 +51,12 @@ class FlowBaseline {
     } else {
       const a = this.alpha;
       this.mean = a * x + (1 - a) * this.mean;
-      const absResid = Math.abs(x - prevMean);
+      // La dispersión (escala de la onda) debe ser ROBUSTA: una piedra enorme
+      // no debe inflar la escala y dejar sordo al detector del cauce. Un residuo
+      // mayor que ~8 desviaciones es "un evento, no el flujo": no enseña la
+      // escala más allá de ese tope. El ruido normal (<8 dev) no se ve afectado.
+      let absResid = Math.abs(x - prevMean);
+      if (prevDev > 0) absResid = Math.min(absResid, 8 * prevDev);
       this.dev = a * absResid + (1 - a) * this.dev;
     }
     this.n++;
@@ -104,10 +109,19 @@ class RiverDetector {
    * @param {number} o.cusumH     Umbral del CUSUM.
    */
   constructor(o = {}) {
-    const { halfLife = 50, warmup = 30, rippleZ = 4, cusumDrift = 0.5, cusumH = 5 } = o;
+    // Una sola base de flujo alimenta ambos detectores a partir del MISMO
+    // residuo estandarizado. La base sigue el oleaje normal (lo elimina del
+    // residuo), así que ni la onda ni el cauce se disparan con el vaivén sano.
+    //  - ONDA  = |z| puntual grande.
+    //  - CAUCE = CUSUM: muchos z moderados sostenidos en una dirección. El
+    //    colchón (drift) se fija por encima del pequeño sesgo que el oleaje
+    //    deja en el residuo, de modo que solo un desvío REAL acumula.
+    const { halfLife = 15, warmup = 40, rippleZ = 4, cusumDrift = 1.0, cusumH = 5, shiftCooldown = 30 } = o;
     this.baseline = new FlowBaseline({ halfLife, warmup });
     this.cusum = new Cusum({ drift: cusumDrift, threshold: cusumH });
     this.rippleZ = rippleZ;
+    this.shiftCooldown = shiftCooldown; // muestras de silencio tras avisar de un cauce
+    this.cooldownUntil = 0;
     this.t = 0;
   }
 
@@ -122,29 +136,30 @@ class RiverDetector {
    */
   push(x) {
     this.t++;
+    const K = 1.2533; // sqrt(pi/2): desv. absoluta media -> desv. típica (ruido gaussiano)
+
     const { prevMean, prevDev } = this.baseline.observe(x);
-    // Escala mínima para no dividir por ~0 en flujos muy planos.
-    const scale = Math.max(prevDev, 1e-9);
-    // Factor 1.2533 ~= sqrt(pi/2): convierte desv. absoluta media en algo
-    // comparable a una desviación típica bajo ruido gaussiano.
-    const z = this.baseline.n > 1 ? (x - prevMean) / (scale * 1.2533) : 0;
+    const z = this.baseline.n > 1 ? (x - prevMean) / (Math.max(prevDev, 1e-9) * K) : 0;
 
     const ready = this.baseline.ready;
     let ripple = false, shift = false, shiftDir = null, cusumLevel = 0;
 
     if (ready) {
       ripple = Math.abs(z) >= this.rippleZ;
-      // Al CUSUM (detector de CAUCE) le pasamos el z SATURADO: una piedra
-      // puntual enorme no debe contar como desvío sostenido. El cauce solo
-      // cambia si MUCHAS muestras moderadas empujan en la misma dirección.
+      // Al CUSUM le pasamos el z SATURADO: una piedra puntual no debe contar
+      // como desvío sostenido. El cauce cambia solo si muchas muestras
+      // moderadas empujan en la misma dirección.
       const zSat = Math.max(-this.rippleZ, Math.min(this.rippleZ, z));
       const c = this.cusum.update(zSat);
-      shift = c.shifted;
-      shiftDir = c.direction;
       cusumLevel = c.level;
+      // Periodo refractario: un desvío sostenido es UN evento, no muchos. Tras
+      // avisar, callamos mientras la base absorbe el nuevo nivel del río.
+      if (c.shifted && this.t >= this.cooldownUntil) {
+        shift = true; shiftDir = c.direction;
+        this.cooldownUntil = this.t + this.shiftCooldown;
+      }
     }
 
-    // Severidad 0..1: cuán anómala es esta muestra ahora mismo.
     const severity = ready
       ? Math.min(1, Math.max(Math.abs(z) / (this.rippleZ * 1.5), cusumLevel / (this.cusum.h * 1.5)))
       : 0;

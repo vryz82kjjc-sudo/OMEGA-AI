@@ -8,7 +8,7 @@ const { RiverDetector } = require('./detector');
 const { makeRiver } = require('./simulate');
 
 const river = makeRiver({ base: 100, noise: 4, seed: 314159 });
-const det = new RiverDetector({ halfLife: 12, warmup: 30, rippleZ: 4, cusumDrift: 1.0, cusumH: 6 });
+const det = new RiverDetector(); // valores por defecto (base rápida + CUSUM calibrado)
 
 const events = [];
 for (let i = 1; i <= 400; i++) {
