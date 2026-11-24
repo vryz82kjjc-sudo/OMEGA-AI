@@ -111,11 +111,12 @@ code{font-family:var(--mono);background:color-mix(in srgb,var(--fg) 8%,transpare
     <h2>¿Gana el RÍO en datos reales?</h2>
     <p class="lead">11 series reales (CPU en la nube, tráfico, latencia, fallos de sistema) con <strong>29 anomalías etiquetadas por terceros</strong> — etiquetas que no controlo. Se mide la separación (AUC) entre puntos de anomalía y normales, y la curva de recall frente a falsos positivos, con las mismas reglas para ambos.</p>
     <div class="kpis">
+      <div class="kpi"><div class="v" style="color:var(--ok)">0.650</div><div class="l">AUC · Isolation Forest (mejor)</div></div>
       <div class="kpi"><div class="v" style="color:var(--river)">0.596</div><div class="l">AUC de separación · RÍO</div></div>
-      <div class="kpi"><div class="v" style="color:var(--simple)">0.549</div><div class="l">AUC de separación · simple</div></div>
+      <div class="kpi"><div class="v" style="color:var(--simple)">0.549</div><div class="l">AUC · umbral simple</div></div>
       <div class="kpi"><div class="v" style="color:var(--mut)">0.50</div><div class="l">azar puro (referencia)</div></div>
     </div>
-    <p class="muted">Ambos apenas por encima del azar: en datos reales tan variados, ninguno separa bien. El río gana por un margen pequeño.</p>
+    <p class="muted">El Isolation Forest —el método más potente— gana en separación (0.650). Aun así los tres rondan el azar y, a pocas falsas alarmas (≤5), detectan casi lo mismo (~21 de 29): la potencia ayuda, no resuelve.</p>
     <figure>
       <svg id="chartRoc" viewBox="0 0 680 340" role="img" aria-label="Curva de recall frente a falsos positivos"></svg>
       <figcaption>Recall (fracción de las 29 anomalías detectadas) frente a falsos positivos. Mejor = arriba y a la izquierda. A pocos falsos positivos el simple iguala o gana; el río solo despega tolerando más ruido.</figcaption>
@@ -137,6 +138,7 @@ code{font-family:var(--mono);background:color-mix(in srgb,var(--fg) 8%,transpare
       <p style="margin-top:0"><strong>Verdad:</strong> el río detecta, y su maquinaria (CUSUM) tiene fuerza matemática real para señales sutiles y sostenidas — la ley del √n lo demuestra en condiciones controladas.</p>
       <p><strong>No demostrado:</strong> que sea “mejor que lo que existe”. En datos reales diversos, a pocas falsas alarmas, un umbral simple lo iguala o lo supera. Su ventaja teórica (detectar cambios lentos) es también su maldición: confunde la deriva natural de los datos reales con ataques.</p>
     </div>
+    <p><strong>Más potencia, no bala de plata:</strong> un Isolation Forest mejora la separación (AUC 0.650 &gt; 0.596 &gt; 0.549), pero a ≤5 falsos positivos los tres detectan lo mismo (~21/29). El problema de fondo no lo arregla un algoritmo más fuerte.</p>
     <p>La conclusión no es un fracaso, es una brújula: el río necesita <strong>separar el cambio de régimen real de la estacionalidad normal</strong> (desestacionalizar antes del CUSUM) antes de poder ganar en la zona que importa. Es una hipótesis concreta y <strong>aún sin probar</strong>.</p>
     <hr>
     <p class="foot">Datos: Numenta Anomaly Benchmark (series reales, etiquetas independientes) y logs OpenSSH reales (loghub). Todo reproducible: <code>river/study.js</code>, <code>river/sqrt-n.js</code>, <code>river/nab-roc.js</code>. Métrica AUC calculada por punto (conservadora para anomalías de ventana); comparación río vs simple con idéntica regla de puntuación.</p>
