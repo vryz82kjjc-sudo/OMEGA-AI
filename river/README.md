@@ -24,10 +24,22 @@ el total deja de ser casualidad.
 
 ## Ficheros
 
-- `detector.js` — el motor: `FlowBaseline` (EWMA robusto), `Cusum`, `RiverDetector`.
+- `detector.js` — el motor de UN río: `FlowBaseline` (EWMA robusto), `Cusum`, `RiverDetector`.
+- `field.js` — el CAMPO: muchos ríos a la vez + detección de **correlación**.
 - `simulate.js` — río sintético para pruebas (inyecta piedras y desvíos).
-- `demo.js` — demostración por consola: `node river/demo.js`.
-- `server.js` — dashboard en vivo por SSE: `node river/server.js` → http://localhost:7070.
+- `demo.js` — demo de un río por consola: `node river/demo.js`.
+- `field-demo.js` — demo de correlación por consola: `node river/field-demo.js`.
+- `server.js` — dashboard en vivo de UN río: `node river/server.js` → http://localhost:7070.
+- `monitor.js` — dashboard multi-río con correlación: `node river/monitor.js` → http://localhost:7071.
+
+## Correlación (lo que convierte esto en defensa)
+
+Un río suelto con una onda suele ser ruido. La señal de verdad es que **varios
+ríos se muevan JUNTOS**. `RiverField` vigila N canales en paralelo y, cuando
+`corrMin` o más canales tienen anomalía dentro de una ventana de `corrWindow`
+muestras, declara un **evento correlacionado** (p. ej. CPU + red + logins a la
+vez = probable ataque). Medido en `field-demo.js`: una onda suelta en un canal
+NO dispara correlación; un ataque que golpea tres canales a la vez SÍ.
 
 ## Diseño del motor
 
