@@ -101,6 +101,35 @@ de ~15 a ~1 gracias a dos mejoras del motor:
 
 Correr: `node river/gen-log.js /tmp/a.log /tmp/t.json && node river/ingest.js /tmp/a.log /tmp/t.json`
 
+## Medición de falsas alarmas (`node river/bench.js`)
+
+Un defensor no confía en un detector sin medir cuánto se equivoca. El banco
+alimenta el campo con métricas por minuto sobre 40.000 minutos de tráfico
+100% normal y distingue, como un SOC real:
+
+- **SEÑAL** = cualquier onda/cauce en un minuto (ruido de bajo nivel).
+- **ALERTA** = algo correlacionado, o una anomalía que persiste ≥2 minutos
+  seguidos. Es lo que de verdad despierta a alguien.
+
+Resultado medido:
+
+| Métrica | Valor |
+|---|---|
+| Detección (fuerza bruta inyectada) | 100/100, latencia 0 min |
+| Señales falsas | 0,66 % (~1 cada 152 min) |
+| **Alertas falsas** | **0,10 % (~1 cada 1000 min, ~16 h)** |
+
+La distinción señal/alerta recorta las falsas alarmas **6,6×** sin perder
+detección. Un pico suelto de un minuto deja de ser una alerta.
+
+## Validación sobre datos SSH REALES (`node river/ingest-ssh.js`)
+
+Sobre un log público real de OpenSSH (loghub, ~4 h, 520 fallos de login), el
+detector ciego señala cada ventana de fuerza bruta real y nombra la IP
+atacante (p. ej. `183.62.140.253` a 70-91 fallos/min; `5.188.10.180`), con
+correlación cuando `failed` e `invalid_user` saltan juntos. `river/replay.js`
+lo reproduce en vivo en un dashboard. El log de terceros no se versiona.
+
 ## Parámetros (`new RiverDetector({ ... })`)
 
 | Param | Def. | Significado |
