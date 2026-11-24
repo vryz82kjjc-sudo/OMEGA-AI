@@ -130,6 +130,32 @@ atacante (p. ej. `183.62.140.253` a 70-91 fallos/min; `5.188.10.180`), con
 correlación cuando `failed` e `invalid_user` saltan juntos. `river/replay.js`
 lo reproduce en vivo en un dashboard. El log de terceros no se versiona.
 
+## Respuesta automática: bloquear la IP atacante (`responder.js`)
+
+Cuando salta una alerta con IP culpable, el `Responder` puede bloquearla. Como
+bloquear puede volverse en tu contra, lleva salvaguardas obligatorias:
+
+- **Lista blanca**: nunca bloquea rangos internos (10/8, 192.168, 172.16-31,
+  127, enlace local) ni IPs de confianza que configures.
+- **Bloqueo temporal (TTL)**: cada regla caduca y se levanta sola (`sweep`).
+- **Anti-duplicados**: no reañade una IP ya bloqueada; refresca su caducidad.
+- **Límite de ritmo**: tope de bloqueos nuevos por ventana (evita tormentas de
+  bloqueo con las que un atacante podría dejarte sin red).
+- **Simulación por defecto**: genera la regla (`iptables -A INPUT -s <ip> -j
+  DROP`) pero NO la ejecuta. La ejecución real es opt-in vía un *enforcer*
+  enchufable (iptables, nftables, fail2ban, WAF, Cloudflare...).
+
+Demo completa sobre datos SSH reales (detectar + bloquear):
+
+```
+node river/defend-ssh.js <ssh.log>            # simula (no toca el firewall)
+node river/defend-ssh.js <ssh.log> --enforce  # ejecuta iptables (sólo tu sistema)
+```
+
+Sobre el log real bloquea las 4 IPs atacantes reales, deduplica los reintentos
+y mantiene una lista de bloqueo con caducidad. **No ejecutes `--enforce` salvo
+en tu propio sistema y con permisos**: bloquear es una acción real hacia fuera.
+
 ## Parámetros (`new RiverDetector({ ... })`)
 
 | Param | Def. | Significado |
