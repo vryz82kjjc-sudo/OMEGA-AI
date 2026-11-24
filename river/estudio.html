@@ -1,0 +1,190 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Falsos y verdaderos en RÍO</title>
+<style>
+/* Layout: informe científico en una columna, con tablas y dos gráficos SVG.
+   Paleta oscura de laboratorio; azul = RÍO, ámbar = detector simple. */
+:root{
+  --bg:#0a0d12; --panel:#11151d; --line:#232c3a; --fg:#eef2f8; --mut:#8b97ab;
+  --accent:#ff8a1f; --river:#49c2ff; --simple:#f0b24a; --bad:#ff686b; --ok:#5ddb83;
+  --mono:'Space Grotesk',ui-monospace,monospace; --body:'Inter',system-ui,sans-serif;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#f6f7f9; --panel:#ffffff; --line:#e2e6ec; --fg:#141a22; --mut:#5c6675;
+  --accent:#d9700a; --river:#1f7fb8; --simple:#b47d1a; --bad:#cc3b3e; --ok:#2f9c54;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  --bg:#f6f7f9; --panel:#ffffff; --line:#e2e6ec; --fg:#141a22; --mut:#5c6675;
+  --accent:#d9700a; --river:#1f7fb8; --simple:#b47d1a; --bad:#cc3b3e; --ok:#2f9c54;
+  color-scheme:light;
+}}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);line-height:1.55;margin:0}
+.wrap{max-width:860px;margin:0 auto;padding-block:40px;
+  padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--mono);line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(28px,6vw,42px);font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--mut);font-size:17px;margin-top:10px}
+.eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;font-size:12px;color:var(--accent);font-weight:600}
+section{margin-top:48px}
+h2{font-size:24px;margin-bottom:6px}
+h2 .n{color:var(--accent)}
+p{margin:12px 0}
+.lead{font-size:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-top:16px}
+.muted{color:var(--mut)}
+strong{color:var(--fg)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:620px){.grid2{grid-template-columns:1fr}}
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.cell{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--panel)}
+.cell .t{font-family:var(--mono);font-weight:600;font-size:15px}
+.cell .d{color:var(--mut);font-size:13.5px;margin-top:4px}
+.cell.tp{border-color:color-mix(in srgb,var(--ok) 55%,var(--line))}
+.cell.fp{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
+.cell.fn{border-color:color-mix(in srgb,var(--bad) 60%,var(--line))}
+.tag{font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;display:inline-block}
+.tag.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 16%,transparent)}
+.tag.ac{color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.tag.bad{color:var(--bad);background:color-mix(in srgb,var(--bad) 16%,transparent)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14.5px;margin-top:6px}
+th,td{text-align:right;padding:8px 10px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+thead th{font-family:var(--mono);font-weight:600;color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.hand{color:var(--simple)} .dyn{color:var(--river)}
+figure{margin:18px 0 6px}
+figcaption{color:var(--mut);font-size:13px;margin-top:8px}
+svg{width:100%;height:auto;display:block}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13.5px;font-family:var(--mono);margin-top:8px}
+.legend b{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:middle;margin-right:6px}
+.kpis{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}
+.kpi{flex:1 1 150px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.kpi .v{font-family:var(--mono);font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.kpi .l{color:var(--mut);font-size:12.5px;margin-top:2px}
+.verdict{border-left:3px solid var(--accent);padding:4px 0 4px 16px;margin-top:14px}
+hr{border:0;border-top:1px solid var(--line);margin:40px 0 0}
+.foot{color:var(--mut);font-size:13px;margin-top:18px}
+code{font-family:var(--mono);background:color-mix(in srgb,var(--fg) 8%,transparent);padding:1px 5px;border-radius:5px;font-size:.92em}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+
+<div class="wrap">
+  <div class="eyebrow">Proyecto RÍO · estudio empírico</div>
+  <h1>Falsos y verdaderos: la fuerza de cada detector</h1>
+  <p class="sub">Qué separa una alarma acertada de una falsa, cuánta “fuerza matemática” tiene cada mecanismo, y si el detector RÍO supera a un umbral simple cuando se mide sobre datos reales etiquetados por terceros.</p>
+
+  <section>
+    <div class="eyebrow">01 · El marco</div>
+    <h2>Los cuatro resultados posibles</h2>
+    <p class="lead">Un detector solo puede hacer dos cosas: disparar o callar. La realidad solo puede hacer dos: había ataque o no. De ahí salen cuatro casillas. La semejanza entre un acierto y una falsa alarma es total desde dentro: en ambos el detector <strong>hace lo mismo</strong>. Lo que los separa es si la realidad le dio la razón.</p>
+    <div class="quad">
+      <div class="cell tp"><div class="t"><span class="tag ok">acierto</span> Positivo verdadero</div><div class="d">Disparó y sí había ataque. El objetivo.</div></div>
+      <div class="cell fp"><div class="t"><span class="tag ac">coste</span> Falso positivo</div><div class="d">Disparó sin ataque. Fatiga de alarma y, con bloqueo automático, cortar a un inocente.</div></div>
+      <div class="cell fn"><div class="t"><span class="tag bad">peligro</span> Falso negativo</div><div class="d">Calló con ataque. El más grave: la brecha que nadie vio.</div></div>
+      <div class="cell"><div class="t"><span class="tag ok">correcto</span> Negativo verdadero</div><div class="d">Calló sin ataque. El estado normal del sistema.</div></div>
+    </div>
+    <p class="muted">Afinar un detector es elegir a cuál de los dos errores le tienes más miedo. No existe el que no comete ninguno.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">02 · La fuerza matemática</div>
+    <h2>La mano y la dinamita</h2>
+    <p class="lead">Dos mecanismos con potencias distintas. La <span class="hand"><strong>mano</strong></span> (z puntual) mide un golpe aislado: dispara si una muestra se aleja ≥4σ. La <span class="dyn"><strong>dinamita</strong></span> (CUSUM) acumula muchos empujoncitos: su fuerza crece con el tiempo.</p>
+    <figure>
+      <svg id="chartForce" viewBox="0 0 680 320" role="img" aria-label="Probabilidad de detección según el tamaño del desvío"></svg>
+      <figcaption>Con el mismo tiempo (n=300 muestras), probabilidad de detectar un desvío sostenido de tamaño δ. La mano necesita un golpe grande (~4σ); la dinamita caza desvíos diminutos.</figcaption>
+    </figure>
+    <div class="card">
+      <h3 style="font-size:15px;margin-bottom:8px">La ley del √n</h3>
+      <p style="margin-top:4px">El desvío mínimo que la dinamita detecta cae como <code>δ_mín ∝ 1/√n</code>: cuanto más tiempo le das, señales más débiles delata. La columna <code>δ_mín·√n</code> se mantiene casi constante — así se confirma la ley.</p>
+      <table>
+        <thead><tr><th>tiempo n</th><th>δ_mín (dinamita)</th><th>δ_mín × √n</th></tr></thead>
+        <tbody id="lawRows"></tbody>
+      </table>
+      <p class="muted" style="margin-top:10px">A n=800 la ley “se rompe” (baja a 1.1): detectar δ=0.04 ya es detectar el ruido. <strong>La misma potencia que caza lo sutil se vuelve falsos positivos si la fuerzas.</strong></p>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">03 · La prueba honesta</div>
+    <h2>¿Gana el RÍO en datos reales?</h2>
+    <p class="lead">11 series reales (CPU en la nube, tráfico, latencia, fallos de sistema) con <strong>29 anomalías etiquetadas por terceros</strong> — etiquetas que no controlo. Se mide la separación (AUC) entre puntos de anomalía y normales, y la curva de recall frente a falsos positivos, con las mismas reglas para ambos.</p>
+    <div class="kpis">
+      <div class="kpi"><div class="v" style="color:var(--river)">0.596</div><div class="l">AUC de separación · RÍO</div></div>
+      <div class="kpi"><div class="v" style="color:var(--simple)">0.549</div><div class="l">AUC de separación · simple</div></div>
+      <div class="kpi"><div class="v" style="color:var(--mut)">0.50</div><div class="l">azar puro (referencia)</div></div>
+    </div>
+    <p class="muted">Ambos apenas por encima del azar: en datos reales tan variados, ninguno separa bien. El río gana por un margen pequeño.</p>
+    <figure>
+      <svg id="chartRoc" viewBox="0 0 680 340" role="img" aria-label="Curva de recall frente a falsos positivos"></svg>
+      <figcaption>Recall (fracción de las 29 anomalías detectadas) frente a falsos positivos. Mejor = arriba y a la izquierda. A pocos falsos positivos el simple iguala o gana; el río solo despega tolerando más ruido.</figcaption>
+    </figure>
+    <div class="legend">
+      <span><b style="background:var(--river)"></b>RÍO</span>
+      <span><b style="background:var(--simple)"></b>Detector simple (z de ventana)</span>
+    </div>
+    <div class="grid2" style="margin-top:16px">
+      <div class="card" style="margin-top:0"><h3 style="font-size:14px">A ≤5 falsos positivos</h3><p style="margin:6px 0 0"><span class="dyn">RÍO 9/29</span> · <span class="hand">simple 11/29</span></p><p class="muted" style="margin:4px 0 0">El simple gana en la zona usable.</p></div>
+      <div class="card" style="margin-top:0"><h3 style="font-size:14px">Techo de recall</h3><p style="margin:6px 0 0"><span class="dyn">RÍO 19/29</span> · <span class="hand">simple 17/29</span></p><p class="muted" style="margin:4px 0 0">El río detecta más… con muchos más falsos.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">04 · Veredicto</div>
+    <h2>Qué es verdad y qué no</h2>
+    <div class="verdict">
+      <p style="margin-top:0"><strong>Verdad:</strong> el río detecta, y su maquinaria (CUSUM) tiene fuerza matemática real para señales sutiles y sostenidas — la ley del √n lo demuestra en condiciones controladas.</p>
+      <p><strong>No demostrado:</strong> que sea “mejor que lo que existe”. En datos reales diversos, a pocas falsas alarmas, un umbral simple lo iguala o lo supera. Su ventaja teórica (detectar cambios lentos) es también su maldición: confunde la deriva natural de los datos reales con ataques.</p>
+    </div>
+    <p>La conclusión no es un fracaso, es una brújula: el río necesita <strong>separar el cambio de régimen real de la estacionalidad normal</strong> (desestacionalizar antes del CUSUM) antes de poder ganar en la zona que importa. Es una hipótesis concreta y <strong>aún sin probar</strong>.</p>
+    <hr>
+    <p class="foot">Datos: Numenta Anomaly Benchmark (series reales, etiquetas independientes) y logs OpenSSH reales (loghub). Todo reproducible: <code>river/study.js</code>, <code>river/sqrt-n.js</code>, <code>river/nab-roc.js</code>. Métrica AUC calculada por punto (conservadora para anomalías de ventana); comparación río vs simple con idéntica regla de puntuación.</p>
+</section>
+</div>
+
+<script>
+const law=[[25,0.54,2.70],[50,0.40,2.83],[100,0.28,2.80],[200,0.16,2.26],[400,0.08,1.60],[800,0.04,1.13]];
+const force=[[0.1,1,49],[0.2,1,78],[0.3,1,96],[0.5,3,100],[0.8,13,100],[1.5,84,100],[3.0,100,100]];
+const river=[[4,0.172],[5,0.31],[6,0.31],[7,0.379],[8,0.448],[9,0.517],[17,0.552],[20,0.586],[24,0.621],[26,0.655],[32,0.655]];
+const simple=[[2,0.276],[3,0.276],[4,0.379],[5,0.379],[6,0.517],[8,0.586],[9,0.586],[12,0.586],[16,0.586],[23,0.586],[30,0.586]];
+const css=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+const SVGNS='http://www.w3.org/2000/svg';
+function el(n,a){const e=document.createElementNS(SVGNS,n);for(const k in a)e.setAttribute(k,a[k]);return e;}
+
+// tabla ley
+document.getElementById('lawRows').innerHTML=law.map(r=>`<tr><td>${r[0]}</td><td>${r[1].toFixed(2)}</td><td>${r[2].toFixed(2)}</td></tr>`).join('');
+
+function axes(svg,W,H,P,xmax,ymax,xlab,ylab,yfmt){
+  const mut=css('--mut'),line=css('--line');
+  svg.appendChild(el('line',{x1:P,y1:H-P,x2:W-10,y2:H-P,stroke:mut,'stroke-width':1}));
+  svg.appendChild(el('line',{x1:P,y1:12,x2:P,y2:H-P,stroke:mut,'stroke-width':1}));
+  for(let g=0;g<=5;g++){const y=12+(H-P-12)*g/5;const v=ymax*(1-g/5);
+    svg.appendChild(el('line',{x1:P,y1:y,x2:W-10,y2:y,stroke:line,'stroke-width':1,opacity:g?.5:0}));
+    const t=el('text',{x:P-8,y:y+4,fill:mut,'font-size':11,'text-anchor':'end','font-family':'monospace'});t.textContent=yfmt(v);svg.appendChild(t);}
+  for(let g=0;g<=xmax/((xmax>10)?8:0.5);g++){const xv=g*((xmax>10)?8:0.5);if(xv>xmax)break;const x=P+(W-10-P)*xv/xmax;
+    const t=el('text',{x,y:H-P+18,fill:mut,'font-size':11,'text-anchor':'middle','font-family':'monospace'});t.textContent=(xmax>10?xv:xv.toFixed(1));svg.appendChild(t);}
+  const xl=el('text',{x:(W+P)/2,y:H-4,fill:mut,'font-size':12,'text-anchor':'middle','font-family':'monospace'});xl.textContent=xlab;svg.appendChild(xl);
+  const yl=el('text',{x:14,y:(H-P)/2,fill:mut,'font-size':12,'text-anchor':'middle','font-family':'monospace',transform:`rotate(-90 14 ${(H-P)/2})`});yl.textContent=ylab;svg.appendChild(yl);
+}
+function plot(svg,data,W,H,P,xmax,ymax,color,xi,yi){
+  const X=v=>P+(W-10-P)*v/xmax, Y=v=>12+(H-P-12)*(1-v/ymax);
+  const pts=data.map(d=>`${X(d[xi])},${Y(d[yi])}`).join(' ');
+  svg.appendChild(el('polyline',{points:pts,fill:'none',stroke:color,'stroke-width':2.4,'stroke-linejoin':'round'}));
+  data.forEach(d=>svg.appendChild(el('circle',{cx:X(d[xi]),cy:Y(d[yi]),r:3.2,fill:color})));
+}
+// gráfico fuerza (prob detección vs δ)
+(function(){const svg=document.getElementById('chartForce'),W=680,H=320,P=48;
+  axes(svg,W,H,P,3,100,'desvío δ (en σ)','prob. detección %',v=>Math.round(v)+'%');
+  plot(svg,force,W,H,P,3,100,css('--simple'),0,1);
+  plot(svg,force,W,H,P,3,100,css('--river'),0,2);
+  const l1=el('text',{x:W-16,y:40,fill:css('--river'),'font-size':12,'text-anchor':'end','font-family':'monospace','font-weight':600});l1.textContent='dinamita (CUSUM)';svg.appendChild(l1);
+  const l2=el('text',{x:W-16,y:58,fill:css('--simple'),'font-size':12,'text-anchor':'end','font-family':'monospace','font-weight':600});l2.textContent='mano (z puntual)';svg.appendChild(l2);
+})();
+// gráfico ROC
+(function(){const svg=document.getElementById('chartRoc'),W=680,H=340,P=50;
+  axes(svg,W,H,P,32,0.7,'falsos positivos','recall (de 29)',v=>v.toFixed(1));
+  plot(svg,simple,W,H,P,32,0.7,css('--simple'),0,1);
+  plot(svg,river,W,H,P,32,0.7,css('--river'),0,1);
+})();
+</script>
