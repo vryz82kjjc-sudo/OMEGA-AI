@@ -219,7 +219,17 @@ async function researchOfficial(payload){
     return {url:target.href,result:terminal.resultJson??terminal.result??terminal.message??null,status:terminal.type,verifiedAt:new Date().toISOString()};
   }finally{clearTimeout(timer)}
 }
-async function route(req,res){
+
+function redirectToRiver(req,res){
+  if(req.headers['x-river-origin']==='gateway')return false;
+  const url=new URL(req.url,'http://localhost');
+  const home=url.pathname==='/'||url.pathname==='/index.html';
+  if(!home&&!["/api/capabilities","/api/sources","/api/import-listing","/api/analyze","/api/research"].includes(url.pathname))return false;
+  res.writeHead(307,{'Location':"https://river-syscfg-live-production.up.railway.app"+(home?"/agentes/":url.pathname)+url.search,'Cache-Control':'no-store'});
+  res.end();
+  return true;
+}
+async function route(req,res){if(redirectToRiver(req,res))return;
   const origin=originOf(req),u=new URL(req.url,'http://localhost'),pathname=u.pathname;
   if(req.method==='OPTIONS'){res.writeHead(204,{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'Content-Type, X-Agent-Admin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Vary':'Origin'});res.end();return;}
   if(req.method==='GET'&&(pathname==='/'||pathname==='/index.html'))return sendFile(res,'index.html');
